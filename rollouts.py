@@ -5,6 +5,8 @@ from mpi4py import MPI
 
 from recorder import Recorder
 
+from auxiliary_tasks import Memory
+
 
 class Rollout(object):
     def __init__(self, ob_space, ac_space, nenvs, nsteps_per_seg, nsegs_per_env, nlumps, envs, policy,
@@ -20,6 +22,8 @@ class Rollout(object):
         self.envs = envs
         self.policy = policy
         self.dynamics_list = dynamics_list
+        # self.ndyna = len(dynamics_list)
+        # self.memory = Memory(self.nsteps * self.nenvs * self.ndyna)
 
         self.reward_fun = lambda ext_rew, int_rew: ext_rew_coeff * np.clip(ext_rew, -1., 1.) + int_rew_coeff * int_rew
 
@@ -29,7 +33,8 @@ class Rollout(object):
         self.buf_ext_rews = np.empty((nenvs, self.nsteps), np.float32)
         self.buf_acs = np.empty((nenvs, self.nsteps, *self.ac_space.shape), self.ac_space.dtype)
         self.buf_obs = np.empty((nenvs, self.nsteps, *self.ob_space.shape), self.ob_space.dtype)
-        self.buf_obs_last = np.empty((nenvs, self.nsegs_per_env, *self.ob_space.shape), np.float32)
+        # self.buf_acs_last = np.empty((nenvs, self.nsegs_per_env, *self.ac_space.shape), self.ac_space.dtype)
+        self.buf_obs_last = np.empty((nenvs, self.nsegs_per_env, *self.ob_space.shape), self.ob_space.dtype)
 
         self.buf_news = np.zeros((nenvs, self.nsteps), np.float32)
         self.buf_new_last = self.buf_news[:, 0, ...].copy()
@@ -60,17 +65,27 @@ class Rollout(object):
         int_rew = []
         if self.dynamics_list[0].var_output:
             net_output = []
+            _net_output = []  # for computing score function
             for dynamics in self.dynamics_list:
                 net_output.append(dynamics.calculate_loss(ob=self.buf_obs,
                                                           last_ob=self.buf_obs_last,
                                                           acs=self.buf_acs))
+                _net_output.append(dynamics.calculate_loss(ob=self.buf_obs_last,
+                                                           last_ob=self.buf_obs_last,
+                                                           acs=self.buf_acs))  # TODO: more reasonable choice ?
 
             # cal variance along first dimension .. [n_dyna, n_env, n_step, feature_size]
             # --> [n_env, n_step,feature_size]
             var_output = np.var(net_output, axis=0)
+            _var_output = np.var(_net_output, axis=0)
 
             # cal reward by mean along second dimension .. [n_env, n_step, feature_size] --> [n_env, n_step]
-            var_rew = np.mean(var_output, axis=-1)
+            var_rew = np.mean(var_output, axis=-1)  # agreement
+            _var_rew = np.mean(_var_output, axis=-1)  # disagreement
+
+            # TODO implement our peer prediction score function
+            var_rew = _var_rew - var_rew
+
         else:
             for dynamics in self.dynamics_list:
                 int_rew.append(dynamics.calculate_loss(ob=self.buf_obs,

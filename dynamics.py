@@ -6,6 +6,16 @@ from utils import small_convnet, flatten_two_dims, unflatten_first_dim, getsess,
 
 
 class Dynamics(object):
+    """
+    Structure
+    self.obs --(self.get_features())--> self.features
+             --(self.get_loss())--> self.loss
+
+    self.var_output is always true,
+      so the output of self.get_loss() is always prediction,
+      not loss as it seems to be.
+    """
+
     def __init__(self, auxiliary_task, predict_from_pixels, var_output, feat_dim=None, scope='dynamics'):
         self.scope = scope
         self.auxiliary_task = auxiliary_task
@@ -29,8 +39,6 @@ class Dynamics(object):
             self.partial_loss = self.get_loss_partial()
 
     def get_features(self, x, reuse):
-        """ Predict the next features """
-
         nl = tf.nn.leaky_relu
         x_has_timesteps = (x.get_shape().ndims == 5)
         if x_has_timesteps:
@@ -50,7 +58,6 @@ class Dynamics(object):
 
         def add_ac(x):
             """ Add actions along the last dimension of x """
-
             return tf.concat([x, ac], axis=-1)
 
         with tf.variable_scope(self.scope):
@@ -59,7 +66,6 @@ class Dynamics(object):
 
             def residual(x):
                 """ Construct a three-layer residual network given the input x """
-
                 res = tf.layers.dense(add_ac(x), self.hidsize, activation=tf.nn.leaky_relu)
                 res = tf.layers.dense(add_ac(res), self.hidsize, activation=None)
                 return x + res
@@ -108,6 +114,7 @@ class Dynamics(object):
         :param last_ob: last observation
         :param acs: actions
         """
+
         n_chunks = 8
         n = ob.shape[0]
         chunk_size = n // n_chunks

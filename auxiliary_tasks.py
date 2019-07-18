@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 
 from utils import small_convnet, fc, activ, flatten_two_dims, unflatten_first_dim, small_deconvnet
@@ -161,3 +162,29 @@ class JustPixels(FeatureExtractor):
 
     def get_loss(self):
         return tf.zeros((), dtype=tf.float32)
+
+
+class Memory():
+    def __init__(self, mem_size, num_dynamics):
+        self.cur_idx = 0
+        self.full = False
+        self.mem_size = mem_size
+        self.num_dynamics = num_dynamics
+        self.mem_obs = [None for _ in range(mem_size)]
+        self.mem_acs = [None for _ in range(mem_size)]
+
+    def add(self, ob, ac):
+        self.mem_obs[self.cur_idx] = ob
+        self.mem_acs[self.cur_idx] = ac
+        self.cur_idx = (self.cur_idx + 1) % self.mem_size
+
+        if not self.full and self.cur_idx == 0:
+            self.full = True
+
+    def fetch(self):
+        if self.full:
+            indices = np.random.choice(self.mem_size, self.num_dynamics, replace=False)
+        else:
+            indices = np.random.choice(self.cur_idx, self.num_dynamics, replace=False)
+
+        return self.mem_obs[indices], self.mem_acs[indices]
