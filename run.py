@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 try:
     from OpenGL import GLU
 except:
@@ -24,6 +23,9 @@ from wrappers import MontezumaInfoWrapper, make_mario_env, \
     make_unity_maze, StickyActionEnv
 
 import datetime
+
+import os
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 
 
 def start_experiment(**args):

@@ -117,6 +117,9 @@ activ = tf.nn.relu
 
 
 def flatten_two_dims(x):
+    """
+    Flatten the first two dimensions of x
+    """
     return tf.reshape(x, [-1] + x.get_shape().as_list()[2:])
 
 

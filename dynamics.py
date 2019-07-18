@@ -17,7 +17,7 @@ class Dynamics(object):
         self.ac_space = self.auxiliary_task.ac_space
         self.ob_mean = self.auxiliary_task.ob_mean
         self.ob_std = self.auxiliary_task.ob_std
-        self.var_output = var_output
+        self.var_output = var_output  # TODO what for ?
         if predict_from_pixels:
             self.features = self.get_features(self.obs, reuse=False)
         else:
@@ -29,6 +29,8 @@ class Dynamics(object):
             self.partial_loss = self.get_loss_partial()
 
     def get_features(self, x, reuse):
+        """ Predict the next features """
+
         nl = tf.nn.leaky_relu
         x_has_timesteps = (x.get_shape().ndims == 5)
         if x_has_timesteps:
@@ -47,6 +49,8 @@ class Dynamics(object):
         ac = flatten_two_dims(ac)
 
         def add_ac(x):
+            """ Add actions along the last dimension of x """
+
             return tf.concat([x, ac], axis=-1)
 
         with tf.variable_scope(self.scope):
@@ -54,6 +58,8 @@ class Dynamics(object):
             x = tf.layers.dense(add_ac(x), self.hidsize, activation=tf.nn.leaky_relu)
 
             def residual(x):
+                """ Construct a three-layer residual network given the input x """
+
                 res = tf.layers.dense(add_ac(x), self.hidsize, activation=tf.nn.leaky_relu)
                 res = tf.layers.dense(add_ac(res), self.hidsize, activation=None)
                 return x + res
@@ -66,9 +72,11 @@ class Dynamics(object):
             if self.var_output:
                 return x
             else:
-                return tf.reduce_mean((x - tf.stop_gradient(self.out_features)) ** 2, -1)
+                return tf.reduce_mean((x - tf.stop_gradient(self.out_features)) ** 2, -1)  # mean square error
 
     def get_loss_partial(self):
+        """ The differences between this function and the last one are the reuse and return """
+
         ac = tf.one_hot(self.ac, self.ac_space.n, axis=2)
         sh = tf.shape(ac)
         ac = flatten_two_dims(ac)
@@ -76,7 +84,7 @@ class Dynamics(object):
         def add_ac(x):
             return tf.concat([x, ac], axis=-1)
 
-        with tf.variable_scope(self.scope,  reuse=True):
+        with tf.variable_scope(self.scope,  reuse=True):  # difference
             x = flatten_two_dims(self.features)
             x = tf.layers.dense(add_ac(x), self.hidsize, activation=tf.nn.leaky_relu)
 
@@ -93,6 +101,13 @@ class Dynamics(object):
             return tf.nn.dropout(tf.reduce_mean(((x - tf.stop_gradient(self.out_features)) ** 2), -1), keep_prob=0.8)
 
     def calculate_loss(self, ob, last_ob, acs):
+        """
+        Parameters
+        ----------
+        :param ob: observation
+        :param last_ob: last observation
+        :param acs: actions
+        """
         n_chunks = 8
         n = ob.shape[0]
         chunk_size = n // n_chunks

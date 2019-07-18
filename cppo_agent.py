@@ -19,6 +19,9 @@ getsess = tf.get_default_session
 
 
 class PpoOptimizer(object):
+    """
+    I don't see any difference with normal PPO
+    """
     envs = None
 
     def __init__(self, *, scope, ob_space, ac_space, stochpol,
